@@ -1,0 +1,119 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String
+  name          String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  instagramAccount  InstagramAccount?
+  posts             GeneratedPost[]
+  captions          GeneratedCaption[]
+  chatSessions      ChatSession[]
+  settings          UserSettings?
+}
+
+model InstagramAccount {
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  user            User      @relation(fields: [userId], references: [id])
+  instagramId     String    @unique
+  username        String
+  accessToken     String
+  refreshToken    String?
+  tokenExpiry     DateTime?
+  followers       Int       @default(0)
+  following       Int       @default(0)
+  postsCount      Int       @default(0)
+  lastSynced      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  insights        InstagramInsight[]
+}
+
+model InstagramInsight {
+  id              String    @id @default(cuid())
+  accountId       String
+  account         InstagramAccount @relation(fields: [accountId], references: [id])
+  date            DateTime
+  followers       Int
+  reach           Int
+  impressions     Int
+  engagement      Float
+  profileViews    Int
+  websiteClicks   Int
+  createdAt       DateTime  @default(now())
+}
+
+model GeneratedPost {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+  imageUrl        String?
+  caption         String
+  hashtags        String
+  style           String
+  theme           String?
+  isActive        Boolean   @default(true)
+  scheduledAt     DateTime?
+  postedAt        DateTime?
+  instagramPostId String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model GeneratedCaption {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+  inputText       String
+  caption         String
+  hashtags        String
+  tone            String
+  category        String?
+  seoScore        Float?
+  createdAt       DateTime  @default(now())
+}
+
+model ChatSession {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+  sessionId       String    @unique
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  messages        ChatMessage[]
+}
+
+model ChatMessage {
+  id              String    @id @default(cuid())
+  sessionId       String
+  session         ChatSession @relation(fields: [sessionId], references: [id])
+  role            String
+  content         String
+  createdAt       DateTime  @default(now())
+}
+
+model UserSettings {
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  user            User      @relation(fields: [userId], references: [id])
+  defaultTone     String    @default("professional")
+  defaultStyle    String    @default("modern")
+  autoPostEnabled Boolean   @default(false)
+  postFrequency   String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
