@@ -2,7 +2,7 @@ import OpenAI from "openai";
 
 const globalNvidiaKey = process.env.NVIDIA_API_KEY || "";
 
-export const NEMOTRON_MODEL = "nvidia/nemotron-3-super-120b-a12b";
+export const NEMOTRON_MODEL = "meta/llama-3.1-8b-instruct";
 
 function getNemotron(userApiKey?: string | null): OpenAI {
   const key = userApiKey || globalNvidiaKey;
@@ -21,10 +21,19 @@ export async function generateWithNemotron(prompt: string, userApiKey?: string |
   const client = getNemotron(userApiKey);
   const response = await client.chat.completions.create({
     model: NEMOTRON_MODEL,
-    messages: [{ role: "user", content: prompt }],
-    temperature: 0.7,
+    messages: [
+      {
+        role: "system",
+        content: "RULES:\n1. You output ONLY valid JSON. Nothing else.\n2. No explanations, no thinking, no reasoning, no thoughts.\n3. No text before the JSON.\n4. No text after the JSON.\n5. Just the raw JSON object starting with { and ending with }\n6. If you output anything other than JSON, you will fail."
+      },
+      {
+        role: "user",
+        content: prompt
+      }
+    ],
+    temperature: 0.3,
     max_tokens: 2048,
-    top_p: 0.95,
+    top_p: 0.9,
   });
 
   return response.choices[0]?.message?.content || "";

@@ -4,7 +4,7 @@ const globalApiKey = process.env.GEMINI_API_KEY || "";
 
 export const genAI = globalApiKey ? new GoogleGenerativeAI(globalApiKey) : null;
 
-export const MODEL_NAME = "gemini-1.5-flash";
+export const MODEL_NAME = "gemini-2.0-flash-lite";
 
 function getClient(userApiKey?: string | null): GoogleGenerativeAI {
   const key = userApiKey || globalApiKey;

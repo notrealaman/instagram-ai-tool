@@ -34,68 +34,153 @@ export async function POST(request: Request) {
       captionLength,
     } = generateCaptionSchema.parse(body);
 
-    const settings = await db.userSettings.findUnique({
-      where: { userId: user.userId },
-    });
-
     const lengthGuide = {
       short: "1-2 sentences, under 100 characters",
       medium: "2-3 sentences, 100-200 characters",
       long: "3-4 sentences, 200-300 characters",
     };
 
-    const prompt = `You are an SEO expert and Instagram content strategist. Generate 3 SEO-optimized Instagram captions for the following:
+    const selectedTone = tone || "Professional";
+    const selectedCategory = category || "General";
+    const selectedLength = captionLength || "medium";
+
+    const prompt = `Generate 3 Instagram captions as valid JSON. Output ONLY the JSON object.
 
 Topic: ${topic}
-Tone: ${tone || "Professional"}
-Category: ${category || "General"}
-${keywords ? `Target keywords: ${keywords}` : ""}
-Caption length: ${lengthGuide[captionLength || "medium"]}
-${includeEmojis !== false ? "Include relevant emojis" : "No emojis"}
-${includeCTA !== false ? "Include a call-to-action" : "No call-to-action"}
-${includeHashtags !== false ? "Include 5-7 relevant hashtags" : "No hashtags"}
+Tone: ${selectedTone}
+Category: ${selectedCategory}
+${keywords ? `Keywords: ${keywords}` : ""}
+Length: ${lengthGuide[selectedLength]}
+${includeEmojis !== false ? "Use these emojis naturally in text: 🚀 💡 ✨ 🔥 📈 💪 🎯 🌟 ⭐ 💯" : "No emojis in text"}
+${includeCTA !== false ? "End each caption with a call-to-action question or statement" : "No CTA"}
+${includeHashtags !== false ? "Put hashtags ONLY in the hashtags array, NOT in the text field" : "No hashtags"}
 
-Requirements:
-1. Each caption should be unique in style
-2. Optimize for Instagram SEO
-3. Use natural language with target keywords
-4. Make it engaging and shareable
+IMPORTANT RULES:
+1. The "text" field contains ONLY the caption text, NO hashtags in it
+2. The "hashtags" array contains hashtags WITHOUT the # symbol
+3. Each hashtag should be ONE word (e.g., "instagramtips" not "instagram tips")
+4. Use line breaks (\\n) in text for readability
+5. seoScore should be between 70-95
 
-Respond in this exact JSON format:
-{
-  "captions": [
-    {
-      "text": "caption 1 text",
-      "hashtags": ["tag1", "tag2", "tag3", "tag4", "tag5"],
-      "seoScore": 92
-    },
-    {
-      "text": "caption 2 text",
-      "hashtags": ["tag1", "tag2", "tag3", "tag4", "tag5"],
-      "seoScore": 87
-    },
-    {
-      "text": "caption 3 text",
-      "hashtags": ["tag1", "tag2", "tag3", "tag4", "tag5"],
-      "seoScore": 85
-    }
-  ]
-}`;
+Return this JSON:
+{"captions":[{"text":"First line hook\\n\\nSecond part of caption with value","hashtags":["instagramtips","socialmediamarketing","growthhacks","contentcreation","engagement"],"characterCount":120,"seoScore":88,"style":"Emotional"},{"text":"Educational caption\\n\\nWith useful tips for the audience","hashtags":["digitalmarketing","instagramgrowth","socialmediatips","branding","onlinebusiness"],"characterCount":110,"seoScore":85,"style":"Value"},{"text":"Question hook caption\\n\\nAsk audience to engage in comments","hashtags":["marketingtips","instagramgrowth","socialmediastrategy","communitybuilding","contentmarketing"],"characterCount":115,"seoScore":82,"style":"Engagement"}]}`;
 
-    const response = await generateWithNemotron(prompt, settings?.nvidiaApiKey);
+    console.log("[Caption Generator] Calling Nemotron API...");
 
-    const jsonMatch = response.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
+    let response: string;
+    try {
+      response = await generateWithNemotron(prompt);
+    } catch (aiErr) {
+      console.error("[Caption Generator] Nemotron API error:", aiErr);
       return NextResponse.json(
-        { error: "Failed to generate captions" },
+        { error: `AI API error: ${aiErr instanceof Error ? aiErr.message : String(aiErr)}` },
         { status: 500 }
       );
     }
 
-    const result = JSON.parse(jsonMatch[0]);
+    console.log("[Caption Generator] Response length:", response.length);
+
+    // Try multiple JSON extraction strategies
+    let captions = null;
+
+    // Strategy 1: Find the last complete JSON object in the response
+    const allJsonMatches = response.match(/\{[\s\S]*?\}/g);
+    if (allJsonMatches) {
+      for (let i = allJsonMatches.length - 1; i >= 0; i--) {
+        try {
+          const parsed = JSON.parse(allJsonMatches[i]);
+          if (parsed.captions && Array.isArray(parsed.captions) && parsed.captions.length > 0) {
+            captions = parsed.captions;
+            break;
+          }
+        } catch {
+          continue;
+        }
+      }
+    }
+
+    // Strategy 2: Try greedy match for the largest JSON object
+    if (!captions) {
+      const greedyMatch = response.match(/\{[\s\S]*\}/);
+      if (greedyMatch) {
+        try {
+          const parsed = JSON.parse(greedyMatch[0]);
+          if (parsed.captions && Array.isArray(parsed.captions) && parsed.captions.length > 0) {
+            captions = parsed.captions;
+          }
+        } catch {
+          // Try to fix common JSON issues
+          let fixed = greedyMatch[0]
+            .replace(/,\s*}/g, "}")
+            .replace(/,\s*]/g, "]");
+          try {
+            const parsed = JSON.parse(fixed);
+            if (parsed.captions && Array.isArray(parsed.captions) && parsed.captions.length > 0) {
+              captions = parsed.captions;
+            }
+          } catch {
+            // continue to next strategy
+          }
+        }
+      }
+    }
+
+    // Strategy 3: Look for captions array directly
+    if (!captions) {
+      const arrayMatch = response.match(/\[[\s\S]*\]/);
+      if (arrayMatch) {
+        try {
+          const parsed = JSON.parse(arrayMatch[0]);
+          if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].text) {
+            captions = parsed;
+          }
+        } catch {
+          // continue
+        }
+      }
+    }
+
+    if (!captions) {
+      console.error("[Caption Generator] Could not extract captions. Response:", response.substring(0, 1000));
+      return NextResponse.json(
+        { error: "Failed to generate captions.", raw: response.substring(0, 1000) },
+        { status: 500 }
+      );
+    }
+
+    // Normalize captions - ensure required fields
+    captions = captions.map((c: Record<string, unknown>, i: number) => ({
+      text: c.text || "",
+      hashtags: Array.isArray(c.hashtags) ? c.hashtags : [],
+      characterCount: (c.characterCount as number) || ((c.text as string) || "").length,
+      seoScore: (c.seoScore as number) || 80,
+      style: (c.style as string) || ["Emotional", "Value", "Engagement"][i] || "General",
+    }));
+
+    console.log("[Caption Generator] Extracted", captions.length, "captions");
+
+    // Save to database
+    try {
+      await db.generatedCaption.create({
+        data: {
+          userId: user.userId,
+          topic,
+          tone: selectedTone,
+          category: selectedCategory,
+          keywords: keywords || null,
+          captionLength: selectedLength,
+          includeEmojis: includeEmojis !== false,
+          includeCTA: includeCTA !== false,
+          includeHashtags: includeHashtags !== false,
+          captions: JSON.stringify(captions),
+        },
+      });
+    } catch (dbError) {
+      console.error("Failed to save caption history:", dbError);
+    }
 
     return NextResponse.json({
-      captions: result.captions,
+      captions,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

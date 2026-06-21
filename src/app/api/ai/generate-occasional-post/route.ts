@@ -4,12 +4,12 @@ import { getUserFromRequest } from "@/lib/auth";
 import { generateImageUrl } from "@/lib/image-generation";
 import { z } from "zod";
 
-const generatePostSchema = z.object({
-  title: z.string().min(1, "Title is required"),
-  theme: z.string().min(1, "Theme is required"),
-  style: z.string().optional(),
-  mood: z.string().optional(),
-  customInput: z.string().optional(),
+const generateOccasionalPostSchema = z.object({
+  occasion: z.string().min(1, "Occasion is required"),
+  customDetails: z.string().optional(),
+  brandName: z.string().optional(),
+  audienceType: z.string().optional(),
+  postDate: z.string().optional(),
   imageSize: z.enum(["square", "portrait", "landscape", "story"]).optional(),
 });
 
@@ -21,36 +21,44 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { title, theme, style, mood, customInput, imageSize } = generatePostSchema.parse(body);
+    const { occasion, customDetails, brandName, audienceType, postDate, imageSize } =
+      generateOccasionalPostSchema.parse(body);
 
-    const prompt = `You are an expert Instagram content creator. Generate an engaging Instagram post for the following:
+    const dateContext = postDate
+      ? `This post is scheduled for ${new Date(postDate).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}.`
+      : "";
 
-Title/Topic: ${title}
-Theme: ${theme}
-Style: ${style || "Modern"}
-Mood: ${mood || "Professional"}
-${customInput ? `Additional details: ${customInput}` : ""}
+    const prompt = `You are an expert Instagram content creator specializing in occasion-based marketing posts.
+
+Generate an engaging Instagram post for this occasion:
+Occasion: ${occasion}
+${brandName ? `Brand/Company: ${brandName}` : ""}
+${audienceType ? `Target Audience: ${audienceType}` : ""}
+${customDetails ? `Additional Details: ${customDetails}` : ""}
+${dateContext}
 
 Requirements:
-1. Write a captivating caption (2-3 sentences max) that directly relates to the title/topic
-2. Include 5-7 relevant hashtags (without # symbol)
-3. Include a call-to-action
-4. Use appropriate emojis naturally
-5. Create a detailed image prompt for AI generation that matches the title and theme
+1. Write a festive, engaging caption (2-4 sentences max) that captures the spirit of ${occasion}
+2. Include relevant emojis that match the occasion
+3. Include 5-7 relevant hashtags (without # symbol)
+4. Include a call-to-action that encourages engagement
+5. Create a detailed image prompt for AI generation that captures the essence of ${occasion}
+
+The tone should be celebratory, warm, and appropriate for ${occasion}.
 
 Respond in this exact JSON format:
 {
-  "caption": "your caption here with emojis",
+  "caption": "your festive caption here with emojis",
   "hashtags": ["hashtag1", "hashtag2", "hashtag3", "hashtag4", "hashtag5"],
-  "imagePrompt": "detailed visual description for AI image generation, include specific elements, colors, composition, lighting"
+  "imagePrompt": "detailed visual description for AI image generation that captures the spirit of ${occasion}"
 }`;
 
-    console.log("[Post Generator] Calling Llama API...");
+    console.log("[Occasional Post] Generating for:", occasion);
     const response = await generateWithNemotron(prompt);
 
     const jsonMatch = response.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      console.error("[Post Generator] No JSON in response");
+      console.error("[Occasional Post] No JSON in response");
       return NextResponse.json(
         { error: "Failed to generate content" },
         { status: 500 }
@@ -61,14 +69,14 @@ Respond in this exact JSON format:
     try {
       result = JSON.parse(jsonMatch[0]);
     } catch {
-      console.error("[Post Generator] JSON parse error");
+      console.error("[Occasional Post] JSON parse error");
       return NextResponse.json(
         { error: "Failed to parse AI response" },
         { status: 500 }
       );
     }
 
-    // Generate image URL based on size
+    // Generate image URL
     const sizeMap = {
       square: { width: 1080, height: 1080 },
       portrait: { width: 1080, height: 1350 },
@@ -77,9 +85,7 @@ Respond in this exact JSON format:
     };
 
     const size = sizeMap[imageSize || "square"];
-
-    // Build image prompt with style context
-    const imagePrompt = result.imagePrompt || `${theme} ${style || ""} ${mood || ""} Instagram post, high quality, professional photography`;
+    const imagePrompt = result.imagePrompt || `${occasion} celebration, festive atmosphere, Instagram post`;
 
     const imageUrl = generateImageUrl({
       prompt: imagePrompt,
@@ -89,14 +95,15 @@ Respond in this exact JSON format:
       enhance: true,
     });
 
-    console.log("[Post Generator] Generated post with image");
+    console.log("[Occasional Post] Generated successfully");
 
     return NextResponse.json({
       caption: result.caption,
       hashtags: result.hashtags,
       imagePrompt: result.imagePrompt,
       imageUrl: imageUrl,
-      imageSize: imageSize || "square",
+      occasion: occasion,
+      postDate: postDate || null,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

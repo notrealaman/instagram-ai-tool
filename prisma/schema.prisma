@@ -20,6 +20,7 @@ model User {
   captions          GeneratedCaption[]
   chatSessions      ChatSession[]
   settings          UserSettings?
+  chatbotSettings   ChatbotSettings?
 }
 
 model InstagramAccount {
@@ -76,12 +77,16 @@ model GeneratedCaption {
   id              String    @id @default(cuid())
   userId          String
   user            User      @relation(fields: [userId], references: [id])
-  inputText       String
-  caption         String
-  hashtags        String
-  tone            String
+  topic           String
+  tone            String?
   category        String?
-  seoScore        Float?
+  keywords        String?
+  captionLength   String    @default("medium")
+  includeEmojis   Boolean   @default(true)
+  includeCTA      Boolean   @default(true)
+  includeHashtags Boolean   @default(true)
+  captions        String    @default("[]")
+  selectedCaption Int?
   createdAt       DateTime  @default(now())
 }
 
@@ -118,6 +123,24 @@ model UserSettings {
   nvidiaApiKey    String?
   instagramAccountId    String?
   instagramAccessToken  String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model ChatbotSettings {
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  user            User      @relation(fields: [userId], references: [id])
+  isEnabled       Boolean   @default(false)
+  botName         String    @default("AI Assistant")
+  personality     String    @default("friendly")
+  mood            String    @default("professional")
+  humorLevel      Int       @default(5)
+  intelligence    Int       @default(7)
+  responseLength  String    @default("medium")
+  customInstructions String?
+  welcomeMessage  String    @default("Hi! How can I help you today?")
+  lastRepliedAt   DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 }
