@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { generateText } from "@/lib/gemini";
+import { getUserFromRequest } from "@/lib/auth";
+import { db } from "@/lib/db";
 import { z } from "zod";
 
 const chatSchema = z.object({
@@ -17,8 +19,17 @@ const chatSchema = z.object({
 
 export async function POST(request: Request) {
   try {
+    const user = await getUserFromRequest(request);
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await request.json();
     const { message, conversationHistory, responseStyle } = chatSchema.parse(body);
+
+    const settings = await db.userSettings.findUnique({
+      where: { userId: user.userId },
+    });
 
     const styleGuide = {
       friendly: "warm, approachable, and use casual language",
@@ -49,7 +60,7 @@ Guidelines:
 
 Respond with just the message text, no JSON formatting needed.`;
 
-    const response = await generateText(prompt);
+    const response = await generateText(prompt, settings?.geminiApiKey);
 
     return NextResponse.json({
       response: response.trim(),

@@ -13,6 +13,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const sidebarItems = [
   {
@@ -117,6 +118,7 @@ export default function DashboardLayout({
             </h1>
           </div>
           <div className="flex items-center gap-4">
+            <ThemeToggle />
             <div className="text-sm text-muted-foreground">
               Welcome back!
             </div>

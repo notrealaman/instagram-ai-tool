@@ -114,6 +114,10 @@ model UserSettings {
   defaultStyle    String    @default("modern")
   autoPostEnabled Boolean   @default(false)
   postFrequency   String?
+  geminiApiKey    String?
+  nvidiaApiKey    String?
+  instagramAccountId    String?
+  instagramAccessToken  String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 }

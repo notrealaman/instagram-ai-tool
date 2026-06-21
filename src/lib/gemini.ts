@@ -1,28 +1,34 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const apiKey = process.env.GEMINI_API_KEY || "";
+const globalApiKey = process.env.GEMINI_API_KEY || "";
 
-export const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
+export const genAI = globalApiKey ? new GoogleGenerativeAI(globalApiKey) : null;
 
 export const MODEL_NAME = "gemini-1.5-flash";
 
-export async function generateText(prompt: string): Promise<string> {
-  if (!genAI) {
+function getClient(userApiKey?: string | null): GoogleGenerativeAI {
+  const key = userApiKey || globalApiKey;
+  if (!key) {
     throw new Error(
-      "Gemini API key not configured. Please add GEMINI_API_KEY to your .env.local file."
+      "Gemini API key not configured. Please add your API key in Settings."
     );
   }
+  return new GoogleGenerativeAI(key);
+}
 
-  const model = genAI.getGenerativeModel({ model: MODEL_NAME });
+export async function generateText(prompt: string, userApiKey?: string | null): Promise<string> {
+  const client = getClient(userApiKey);
+  const model = client.getGenerativeModel({ model: MODEL_NAME });
   const result = await model.generateContent(prompt);
   const response = await result.response;
   return response.text();
 }
 
 export async function generateStructuredContent<T>(
-  prompt: string
+  prompt: string,
+  userApiKey?: string | null
 ): Promise<T> {
-  const text = await generateText(prompt);
+  const text = await generateText(prompt, userApiKey);
 
   const jsonMatch = text.match(/\{[\s\S]*\}/) || text.match(/\[[\s\S]*\]/);
   if (!jsonMatch) {

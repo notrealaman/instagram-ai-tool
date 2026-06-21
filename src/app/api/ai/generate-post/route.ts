@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { generateText } from "@/lib/gemini";
+import { getUserFromRequest } from "@/lib/auth";
+import { db } from "@/lib/db";
 import { z } from "zod";
 
 const generatePostSchema = z.object({
@@ -11,8 +13,17 @@ const generatePostSchema = z.object({
 
 export async function POST(request: Request) {
   try {
+    const user = await getUserFromRequest(request);
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await request.json();
     const { theme, style, mood, customInput } = generatePostSchema.parse(body);
+
+    const settings = await db.userSettings.findUnique({
+      where: { userId: user.userId },
+    });
 
     const prompt = `You are an expert Instagram content creator. Generate an engaging Instagram post caption for the following:
 
@@ -34,7 +45,7 @@ Respond in this exact JSON format:
   "imagePrompt": "detailed prompt for AI image generation matching this theme and style"
 }`;
 
-    const response = await generateText(prompt);
+    const response = await generateText(prompt, settings?.geminiApiKey);
 
     const jsonMatch = response.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {

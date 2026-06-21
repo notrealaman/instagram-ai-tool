@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { generateText } from "@/lib/gemini";
+import { generateWithNemotron } from "@/lib/nemotron";
+import { getUserFromRequest } from "@/lib/auth";
+import { db } from "@/lib/db";
 import { z } from "zod";
 
 const generateCaptionSchema = z.object({
@@ -15,6 +17,11 @@ const generateCaptionSchema = z.object({
 
 export async function POST(request: Request) {
   try {
+    const user = await getUserFromRequest(request);
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await request.json();
     const {
       topic,
@@ -26,6 +33,10 @@ export async function POST(request: Request) {
       includeHashtags,
       captionLength,
     } = generateCaptionSchema.parse(body);
+
+    const settings = await db.userSettings.findUnique({
+      where: { userId: user.userId },
+    });
 
     const lengthGuide = {
       short: "1-2 sentences, under 100 characters",
@@ -71,7 +82,7 @@ Respond in this exact JSON format:
   ]
 }`;
 
-    const response = await generateText(prompt);
+    const response = await generateWithNemotron(prompt, settings?.nvidiaApiKey);
 
     const jsonMatch = response.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
