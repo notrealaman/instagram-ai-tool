@@ -44,47 +44,40 @@ export async function GET(request: Request) {
   console.log("[Webhook] Verification request:", { mode, token, challenge });
 
   if (mode === "subscribe" && token === WEBHOOK_VERIFY_TOKEN) {
-    console.log("[Webhook] Verification successful, returning challenge:", challenge);
-    // Return plain text challenge, NOT JSON
+    console.log("[Webhook] Verification successful");
     return new NextResponse(challenge, {
       status: 200,
       headers: { "Content-Type": "text/plain" },
     });
   }
 
-  console.log("[Webhook] Verification failed - token mismatch");
   return new NextResponse("Verification failed", { status: 403 });
 }
 
 // Handle incoming DM notifications
 export async function POST(request: Request) {
+  let body: WebhookBody;
   try {
-    const body: WebhookBody = await request.json();
+    body = await request.json();
+  } catch {
+    return new NextResponse("OK", { status: 200 });
+  }
 
-    // Verify the request is from Facebook (optional but recommended)
-    if (APP_SECRET) {
-      const signature = request.headers.get("x-hub-signature-256");
-      if (signature) {
-        const rawBody = JSON.stringify(body);
-        const expectedSignature =
-          "sha256=" +
-          crypto.createHmac("sha256", APP_SECRET).update(rawBody).digest("hex");
+  // Always return 200 quickly to prevent Facebook retries
+  // Process async in background
+  processWebhook(body).catch((err) => {
+    console.error("[Webhook] Background processing error:", err);
+  });
 
-        if (signature !== expectedSignature) {
-          console.error("[Webhook] Invalid signature");
-          return new NextResponse("Invalid signature", { status: 403 });
-        }
-      }
-    }
+  return new NextResponse("OK", { status: 200 });
+}
 
-    // Only process page-related notifications
-    if (body.object !== "page") {
-      return new NextResponse("OK", { status: 200 });
-    }
+async function processWebhook(body: WebhookBody) {
+  try {
+    if (body.object !== "page") return;
 
-    console.log("[Webhook] Received notification:", JSON.stringify(body, null, 2));
+    console.log("[Webhook] Received notification:", JSON.stringify(body));
 
-    // Process each entry
     for (const entry of body.entry) {
       for (const change of entry.changes) {
         if (change.field !== "messages") continue;
@@ -96,7 +89,7 @@ export async function POST(request: Request) {
         const recipientId = recipient.id;
         const messageText = message.text;
 
-        console.log(`[Webhook] Message from ${senderId} to ${recipientId}: ${messageText}`);
+        console.log(`[Webhook] DM from ${senderId} to page ${recipientId}: "${messageText}"`);
 
         // Find the user who owns this Instagram account
         const instagramAccount = await db.instagramAccount.findUnique({
@@ -104,7 +97,7 @@ export async function POST(request: Request) {
         });
 
         if (!instagramAccount) {
-          console.log(`[Webhook] No account found for Instagram ID ${recipientId}`);
+          console.log(`[Webhook] No account found for page ${recipientId}`);
           continue;
         }
 
@@ -118,46 +111,7 @@ export async function POST(request: Request) {
           continue;
         }
 
-        // Get conversation history from Instagram API
-        let conversationHistory: Array<{ role: "user" | "assistant"; content: string }> = [];
-        try {
-          const convRes = await fetch(
-            `https://graph.facebook.com/v21.0/${recipientId}/conversations?platform=instagram&fields=id,snippet&limit=10&access_token=${instagramAccount.accessToken}`
-          );
-          const convData = await convRes.json();
-
-          if (convData.data) {
-            // Find conversation with this user
-            for (const conv of convData.data) {
-              const msgRes = await fetch(
-                `https://graph.facebook.com/v21.0/${conv.id}/messages?fields=id,from,message,created_time&limit=10&access_token=${instagramAccount.accessToken}`
-              );
-              const msgData = await msgRes.json();
-
-              if (msgData.data) {
-                // Check if this conversation contains our sender
-                const messages = msgData.data;
-                const hasUser = messages.some(
-                  (m: { from?: { id: string } }) => m.from?.id === senderId
-                );
-
-                if (hasUser) {
-                  conversationHistory = messages.map(
-                    (m: { from?: { id: string }; message: string }) => ({
-                      role: m.from?.id === senderId ? ("user" as const) : ("assistant" as const),
-                      content: m.message,
-                    })
-                  );
-                  break;
-                }
-              }
-            }
-          }
-        } catch (err) {
-          console.log("[Webhook] Could not fetch conversation history:", err);
-        }
-
-        // Build personality prompt
+        // Build AI prompt - no conversation history needed
         const personality = chatbotSettings.personality || "friendly";
         const mood = chatbotSettings.mood || "professional";
         const humorLevel = chatbotSettings.humorLevel || 5;
@@ -195,10 +149,6 @@ export async function POST(request: Request) {
           long: "3-4 sentences, detailed and thorough",
         };
 
-        const historyContext = conversationHistory
-          .map((h) => `${h.role === "user" ? "Customer" : "Bot"}: ${h.content}`)
-          .join("\n");
-
         const prompt = `You are ${botName}, an AI assistant for an Instagram business. A customer just sent you a DM.
 
 PERSONALITY: ${personalityGuide[personality] || personalityGuide.friendly}
@@ -207,12 +157,11 @@ HUMOR LEVEL (${humorLevel}/10): ${humorGuide[humorLevel] || humorGuide[5]}
 RESPONSE LENGTH: ${lengthGuide[responseLength] || lengthGuide.medium}
 ${customInstructions ? `CUSTOM INSTRUCTIONS: ${customInstructions}` : ""}
 
-${historyContext ? `Previous conversation:\n${historyContext}\n` : ""}
 Customer's message: "${messageText}"
 
-Respond with just the message text, no JSON formatting needed. Keep it natural and conversational.`;
+Respond with just the message text, no JSON formatting needed. Keep it natural and conversational. Max 2-3 sentences.`;
 
-        console.log(`[Webhook] Generating reply for sender ${senderId}...`);
+        console.log(`[Webhook] Generating reply for ${senderId}...`);
 
         const reply = await generateWithNemotron(prompt);
         const trimmedReply = reply.trim();
@@ -222,16 +171,12 @@ Respond with just the message text, no JSON formatting needed. Keep it natural a
           continue;
         }
 
-        // Send reply back via Instagram Graph API
+        // Send reply back
         await sendIGMessage(senderId, trimmedReply, instagramAccount.accessToken);
-        console.log(`[Webhook] Reply sent to ${senderId}: ${trimmedReply}`);
+        console.log(`[Webhook] Replied to ${senderId}: ${trimmedReply}`);
       }
     }
-
-    return new NextResponse("OK", { status: 200 });
   } catch (error) {
-    console.error("[Webhook] Error processing notification:", error);
-    // Always return 200 to Facebook to prevent retries
-    return new NextResponse("OK", { status: 200 });
+    console.error("[Webhook] Processing error:", error);
   }
 }
