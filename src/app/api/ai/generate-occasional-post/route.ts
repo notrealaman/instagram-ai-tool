@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { generateWithNemotron } from "@/lib/nemotron";
+import { generateImageWithGemini } from "@/lib/gemini";
 import { getUserFromRequest } from "@/lib/auth";
-import { generateImageUrl } from "@/lib/image-generation";
 import { z } from "zod";
 
 const generateOccasionalPostSchema = z.object({
@@ -76,24 +76,25 @@ Respond in this exact JSON format:
       );
     }
 
-    // Generate image URL
-    const sizeMap = {
-      square: { width: 1080, height: 1080 },
-      portrait: { width: 1080, height: 1350 },
-      landscape: { width: 1080, height: 608 },
-      story: { width: 1080, height: 1920 },
+    const sizeLabels: Record<string, string> = {
+      square: "square 1:1 aspect ratio",
+      portrait: "portrait 4:5 aspect ratio",
+      landscape: "landscape 16:9 aspect ratio",
+      story: "vertical 9:16 aspect ratio for stories",
     };
 
-    const size = sizeMap[imageSize || "square"];
-    const imagePrompt = result.imagePrompt || `${occasion} celebration, festive atmosphere, Instagram post`;
+    const sizeLabel = sizeLabels[imageSize || "square"];
+    const imagePrompt = `${result.imagePrompt || `${occasion} celebration, festive atmosphere, Instagram post`}. Generate as ${sizeLabel} image.`;
 
-    const imageUrl = generateImageUrl({
-      prompt: imagePrompt,
-      width: size.width,
-      height: size.height,
-      model: "flux",
-      enhance: true,
-    });
+    console.log("[Occasional Post] Generating image with Gemini...");
+    let imageUrl: string;
+    try {
+      imageUrl = await generateImageWithGemini(imagePrompt);
+    } catch (imgErr) {
+      console.error("[Occasional Post] Gemini image generation failed, falling back to Pollinations:", imgErr);
+      const encoded = encodeURIComponent(imagePrompt);
+      imageUrl = `https://image.pollinations.ai/prompt/${encoded}?width=1080&height=1080&model=flux&nologo=true`;
+    }
 
     console.log("[Occasional Post] Generated successfully");
 

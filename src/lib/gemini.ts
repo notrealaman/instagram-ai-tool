@@ -4,7 +4,8 @@ const globalApiKey = process.env.GEMINI_API_KEY || "";
 
 export const genAI = globalApiKey ? new GoogleGenerativeAI(globalApiKey) : null;
 
-export const MODEL_NAME = "gemini-2.0-flash-lite";
+export const MODEL_NAME = "gemini-2.5-flash";
+export const IMAGE_MODEL_NAME = "gemini-2.5-flash-image";
 
 function getClient(userApiKey?: string | null): GoogleGenerativeAI {
   const key = userApiKey || globalApiKey;
@@ -36,4 +37,28 @@ export async function generateStructuredContent<T>(
   }
 
   return JSON.parse(jsonMatch[0]) as T;
+}
+
+export async function generateImageWithGemini(
+  prompt: string,
+  userApiKey?: string | null
+): Promise<string> {
+  const client = getClient(userApiKey);
+  const model = client.getGenerativeModel({
+    model: IMAGE_MODEL_NAME,
+  });
+
+  const result = await model.generateContent(prompt);
+  const response = await result.response;
+
+  // Extract image from response parts
+  const parts = response.candidates?.[0]?.content?.parts || [];
+  for (const part of parts) {
+    if (part.inlineData?.data) {
+      const mimeType = part.inlineData.mimeType || "image/png";
+      return `data:${mimeType};base64,${part.inlineData.data}`;
+    }
+  }
+
+  throw new Error("No image was generated in the response");
 }

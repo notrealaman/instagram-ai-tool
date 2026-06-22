@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { generateWithNemotron } from "@/lib/nemotron";
+import { generateImageWithGemini } from "@/lib/gemini";
 import { getUserFromRequest } from "@/lib/auth";
-import { generateImageUrl } from "@/lib/image-generation";
 import { z } from "zod";
 
 const generatePostSchema = z.object({
@@ -68,26 +68,25 @@ Respond in this exact JSON format:
       );
     }
 
-    // Generate image URL based on size
-    const sizeMap = {
-      square: { width: 1080, height: 1080 },
-      portrait: { width: 1080, height: 1350 },
-      landscape: { width: 1080, height: 608 },
-      story: { width: 1080, height: 1920 },
+    const sizeLabels: Record<string, string> = {
+      square: "square 1:1 aspect ratio",
+      portrait: "portrait 4:5 aspect ratio",
+      landscape: "landscape 16:9 aspect ratio",
+      story: "vertical 9:16 aspect ratio for stories",
     };
 
-    const size = sizeMap[imageSize || "square"];
+    const sizeLabel = sizeLabels[imageSize || "square"];
+    const imagePrompt = `${result.imagePrompt || `${theme} ${style || ""} ${mood || ""} Instagram post, high quality, professional photography`}. Generate as ${sizeLabel} image.`;
 
-    // Build image prompt with style context
-    const imagePrompt = result.imagePrompt || `${theme} ${style || ""} ${mood || ""} Instagram post, high quality, professional photography`;
-
-    const imageUrl = generateImageUrl({
-      prompt: imagePrompt,
-      width: size.width,
-      height: size.height,
-      model: "flux",
-      enhance: true,
-    });
+    console.log("[Post Generator] Generating image with Gemini...");
+    let imageUrl: string;
+    try {
+      imageUrl = await generateImageWithGemini(imagePrompt);
+    } catch (imgErr) {
+      console.error("[Post Generator] Gemini image generation failed, falling back to Pollinations:", imgErr);
+      const encoded = encodeURIComponent(imagePrompt);
+      imageUrl = `https://image.pollinations.ai/prompt/${encoded}?width=1080&height=1080&model=flux&nologo=true`;
+    }
 
     console.log("[Post Generator] Generated post with image");
 
