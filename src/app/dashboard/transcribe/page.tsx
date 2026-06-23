@@ -17,8 +17,6 @@ import {
   FileText,
   Sparkles,
   AlertCircle,
-  Link2,
-  Hash,
 } from "lucide-react";
 
 interface TranscriptionResult {
@@ -28,41 +26,34 @@ interface TranscriptionResult {
 }
 
 export default function TranscribePage() {
-  const [inputUrl, setInputUrl] = useState("");
+  const [inputValue, setInputValue] = useState("");
   const [customPrompt, setCustomPrompt] = useState("");
   const [transcribing, setTranscribing] = useState(false);
   const [result, setResult] = useState<TranscriptionResult | null>(null);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState<"transcription" | "summary" | null>(null);
-  const [inputType, setInputType] = useState<"url" | "id">("url");
-
-  const extractPostId = (input: string): string | null => {
-    // If it's already a numeric ID
-    if (/^\d+$/.test(input.trim())) {
-      return input.trim();
-    }
-    // Extract shortcode from URL: instagram.com/p/ABC123/ or instagram.com/reel/ABC123/
-    const match = input.match(/instagram\.com\/(?:p|reel)\/([A-Za-z0-9_-]+)/);
-    if (match) return match[1];
-    return null;
-  };
 
   const handleTranscribe = async () => {
-    if (!inputUrl) return;
+    if (!inputValue) return;
     setTranscribing(true);
     setError("");
     setResult(null);
 
     try {
-      const postId = inputType === "id" ? extractPostId(inputUrl) : null;
+      const trimmed = inputValue.trim();
+
+      // Auto-detect: numeric ID, Instagram URL, or shortcode
+      const isNumericId = /^\d+$/.test(trimmed);
+      const isInstagramUrl = /instagram\.com\/(?:p|reel)\//.test(trimmed);
+
       const body: Record<string, string> = {
         prompt: customPrompt || undefined,
       };
 
-      if (postId) {
-        body.postId = postId;
+      if (isNumericId || isInstagramUrl) {
+        body.postId = trimmed;
       } else {
-        body.videoUrl = inputUrl;
+        body.videoUrl = trimmed;
       }
 
       const res = await fetch("/api/ai/transcribe", {
@@ -104,41 +95,17 @@ export default function TranscribePage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Input type toggle */}
-          <div className="flex gap-2">
-            <Button
-              variant={inputType === "id" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setInputType("id")}
-            >
-              <Hash className="mr-2 h-4 w-4" />
-              Post ID
-            </Button>
-            <Button
-              variant={inputType === "url" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setInputType("url")}
-            >
-              <Link2 className="mr-2 h-4 w-4" />
-              Video URL
-            </Button>
-          </div>
-
           <div className="flex gap-2">
             <Input
-              placeholder={
-                inputType === "id"
-                  ? "Post ID or Instagram URL (e.g., 17841400123456789 or instagram.com/reel/ABC123)"
-                  : "https://... (direct video URL)"
-              }
-              value={inputUrl}
-              onChange={(e) => setInputUrl(e.target.value)}
+              placeholder="Paste Instagram URL, Post ID, or Reel link..."
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
               disabled={transcribing}
               onKeyDown={(e) => e.key === "Enter" && handleTranscribe()}
             />
             <Button
               onClick={handleTranscribe}
-              disabled={transcribing || !inputUrl}
+              disabled={transcribing || !inputValue}
             >
               {transcribing ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -148,11 +115,10 @@ export default function TranscribePage() {
             </Button>
           </div>
 
-          {inputType === "id" && (
-            <p className="text-xs text-muted-foreground">
-              Paste a numeric Post ID or an Instagram post/reel URL. We&apos;ll fetch a fresh video link automatically.
-            </p>
-          )}
+          <p className="text-xs text-muted-foreground">
+            Supports: Instagram post/reel URLs, numeric post IDs, or shortcodes. 
+            We automatically fetch the video and transcribe it.
+          </p>
 
           <div className="space-y-2">
             <label className="text-sm font-medium">Custom Instructions (Optional)</label>
@@ -170,8 +136,8 @@ export default function TranscribePage() {
       {error && (
         <Card className="border-destructive">
           <CardContent className="p-4">
-            <div className="flex items-center gap-2 text-destructive">
-              <AlertCircle className="h-5 w-5" />
+            <div className="flex items-start gap-2 text-destructive">
+              <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
               <p className="text-sm">{error}</p>
             </div>
           </CardContent>
