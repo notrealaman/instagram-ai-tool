@@ -17,6 +17,8 @@ import {
   FileText,
   Sparkles,
   AlertCircle,
+  Link2,
+  Hash,
 } from "lucide-react";
 
 interface TranscriptionResult {
@@ -26,27 +28,47 @@ interface TranscriptionResult {
 }
 
 export default function TranscribePage() {
-  const [videoUrl, setVideoUrl] = useState("");
+  const [inputUrl, setInputUrl] = useState("");
   const [customPrompt, setCustomPrompt] = useState("");
   const [transcribing, setTranscribing] = useState(false);
   const [result, setResult] = useState<TranscriptionResult | null>(null);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState<"transcription" | "summary" | null>(null);
+  const [inputType, setInputType] = useState<"url" | "id">("url");
+
+  const extractPostId = (input: string): string | null => {
+    // If it's already a numeric ID
+    if (/^\d+$/.test(input.trim())) {
+      return input.trim();
+    }
+    // Extract shortcode from URL: instagram.com/p/ABC123/ or instagram.com/reel/ABC123/
+    const match = input.match(/instagram\.com\/(?:p|reel)\/([A-Za-z0-9_-]+)/);
+    if (match) return match[1];
+    return null;
+  };
 
   const handleTranscribe = async () => {
-    if (!videoUrl) return;
+    if (!inputUrl) return;
     setTranscribing(true);
     setError("");
     setResult(null);
 
     try {
+      const postId = inputType === "id" ? extractPostId(inputUrl) : null;
+      const body: Record<string, string> = {
+        prompt: customPrompt || undefined,
+      };
+
+      if (postId) {
+        body.postId = postId;
+      } else {
+        body.videoUrl = inputUrl;
+      }
+
       const res = await fetch("/api/ai/transcribe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          videoUrl,
-          prompt: customPrompt || undefined,
-        }),
+        body: JSON.stringify(body),
       });
 
       const data = await res.json();
@@ -78,21 +100,45 @@ export default function TranscribePage() {
             Video Transcription
           </CardTitle>
           <CardDescription>
-            Paste a direct video URL to transcribe its audio to English text
+            Transcribe audio from Instagram videos to English text
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Input type toggle */}
+          <div className="flex gap-2">
+            <Button
+              variant={inputType === "id" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setInputType("id")}
+            >
+              <Hash className="mr-2 h-4 w-4" />
+              Post ID
+            </Button>
+            <Button
+              variant={inputType === "url" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setInputType("url")}
+            >
+              <Link2 className="mr-2 h-4 w-4" />
+              Video URL
+            </Button>
+          </div>
+
           <div className="flex gap-2">
             <Input
-              placeholder="https://... (direct video URL)"
-              value={videoUrl}
-              onChange={(e) => setVideoUrl(e.target.value)}
+              placeholder={
+                inputType === "id"
+                  ? "Post ID or Instagram URL (e.g., 17841400123456789 or instagram.com/reel/ABC123)"
+                  : "https://... (direct video URL)"
+              }
+              value={inputUrl}
+              onChange={(e) => setInputUrl(e.target.value)}
               disabled={transcribing}
               onKeyDown={(e) => e.key === "Enter" && handleTranscribe()}
             />
             <Button
               onClick={handleTranscribe}
-              disabled={transcribing || !videoUrl}
+              disabled={transcribing || !inputUrl}
             >
               {transcribing ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -102,6 +148,12 @@ export default function TranscribePage() {
             </Button>
           </div>
 
+          {inputType === "id" && (
+            <p className="text-xs text-muted-foreground">
+              Paste a numeric Post ID or an Instagram post/reel URL. We&apos;ll fetch a fresh video link automatically.
+            </p>
+          )}
+
           <div className="space-y-2">
             <label className="text-sm font-medium">Custom Instructions (Optional)</label>
             <Input
@@ -110,9 +162,6 @@ export default function TranscribePage() {
               onChange={(e) => setCustomPrompt(e.target.value)}
               disabled={transcribing}
             />
-            <p className="text-xs text-muted-foreground">
-              Transcription is always in English. Add extra instructions if needed.
-            </p>
           </div>
         </CardContent>
       </Card>
@@ -147,11 +196,9 @@ export default function TranscribePage() {
         <div className="space-y-4">
           <Card className="border-emerald-200 dark:border-emerald-800">
             <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-emerald-600 dark:text-emerald-400">
-                  Transcription complete — {result.videoSize}
-                </span>
-              </div>
+              <span className="text-sm text-emerald-600 dark:text-emerald-400">
+                Transcription complete — {result.videoSize}
+              </span>
             </CardContent>
           </Card>
 
@@ -177,9 +224,7 @@ export default function TranscribePage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="whitespace-pre-wrap text-sm">
-                {result.summary}
-              </div>
+              <div className="whitespace-pre-wrap text-sm">{result.summary}</div>
             </CardContent>
           </Card>
 

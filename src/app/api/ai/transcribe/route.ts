@@ -5,33 +5,43 @@ import { getUserFromRequest } from "@/lib/auth";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 
-async function downloadVideo(url: string, accessToken: string): Promise<{ data: string; mimeType: string }> {
-  const res = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-    redirect: "follow",
-  });
+async function fetchFreshVideoUrl(postId: string, accessToken: string): Promise<{ url: string; type: string }> {
+  const res = await fetch(
+    `https://graph.facebook.com/v21.0/${postId}?fields=media_type,media_url,thumbnail_url,children{media_type,media_url}&access_token=${accessToken}`
+  );
+  const data = await res.json();
 
+  if (data.error) {
+    throw new Error(`Graph API error: ${data.error.message}`);
+  }
+
+  let videoUrl = "";
+  let mediaType = data.media_type;
+
+  if (data.media_type === "VIDEO") {
+    videoUrl = data.media_url;
+  } else if (data.media_type === "CAROUSEL_ALBUM" && data.children?.data) {
+    const videoChild = data.children.data.find(
+      (c: { media_type: string }) => c.media_type === "VIDEO"
+    );
+    if (videoChild) {
+      videoUrl = videoChild.media_url;
+      mediaType = "VIDEO";
+    }
+  }
+
+  if (!videoUrl) {
+    throw new Error("No video found in this post");
+  }
+
+  return { url: videoUrl, type: mediaType };
+}
+
+async function downloadVideo(url: string): Promise<{ data: string; mimeType: string }> {
+  const res = await fetch(url, { redirect: "follow" });
   if (!res.ok) throw new Error(`Failed to download video: ${res.status}`);
 
   const contentType = res.headers.get("content-type") || "";
-
-  if (contentType.includes("text/html")) {
-    const newUrl = `${url}${url.includes("?") ? "&" : "?"}access_token=${accessToken}`;
-    const retryRes = await fetch(newUrl, { redirect: "follow" });
-    if (!retryRes.ok) throw new Error("Failed to download video after retry");
-
-    const retryContentType = retryRes.headers.get("content-type") || "";
-    if (retryContentType.includes("text/html")) {
-      throw new Error("Instagram returned HTML instead of video. The URL may be expired.");
-    }
-
-    const buffer = await retryRes.arrayBuffer();
-    const base64 = Buffer.from(buffer).toString("base64");
-    return { data: base64, mimeType: retryContentType.split(";")[0].trim() };
-  }
-
   const buffer = await res.arrayBuffer();
   const base64 = Buffer.from(buffer).toString("base64");
   return { data: base64, mimeType: contentType.split(";")[0].trim() };
@@ -54,13 +64,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const { accessToken } = instagramAccount;
+    const { instagramId, accessToken } = instagramAccount;
     const body = await request.json();
-    const { videoUrl, prompt } = body;
+    const { videoUrl: inputUrl, prompt, postId } = body;
 
-    if (!videoUrl) {
+    if (!inputUrl && !postId) {
       return NextResponse.json(
-        { error: "Video URL is required" },
+        { error: "Video URL or Post ID is required" },
         { status: 400 }
       );
     }
@@ -73,13 +83,27 @@ export async function POST(request: Request) {
       );
     }
 
-    // Download the video with access token
-    const video = await downloadVideo(videoUrl, accessToken);
+    // Get fresh video URL from Graph API
+    let videoUrl = inputUrl;
+    if (postId) {
+      const fresh = await fetchFreshVideoUrl(postId, accessToken);
+      videoUrl = fresh.url;
+    }
+
+    if (!videoUrl) {
+      return NextResponse.json(
+        { error: "Could not get video URL" },
+        { status: 400 }
+      );
+    }
+
+    // Download the video
+    const video = await downloadVideo(videoUrl);
 
     // Validate MIME type
     if (!video.mimeType.startsWith("video/") && !video.mimeType.startsWith("audio/")) {
       return NextResponse.json(
-        { error: `Invalid content type: ${video.mimeType}. Expected a video file.` },
+        { error: `Invalid content type: ${video.mimeType}. The URL may be expired. Try using a Post ID instead.` },
         { status: 400 }
       );
     }
