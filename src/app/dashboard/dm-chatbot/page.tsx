@@ -403,8 +403,8 @@ export default function DMChatbotPage() {
     <div className="space-y-6">
       {/* Status Bar */}
       <Card>
-        <CardContent className="flex items-center justify-between p-4">
-          <div className="flex items-center gap-4">
+        <CardContent className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4">
+          <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
             <div className="flex items-center gap-2">
               <Power className={`h-5 w-5 ${settings.isEnabled ? "text-emerald-500" : "text-muted-foreground"}`} />
               <span className="font-medium">Auto-Reply</span>
@@ -481,7 +481,7 @@ export default function DMChatbotPage() {
 
       {activeTab === "chat" ? (
         /* Chat Interface */
-        <Card className="flex h-[calc(100vh-16rem)] flex-col">
+        <Card className="flex h-[calc(100vh-20rem)] sm:h-[calc(100vh-16rem)] flex-col">
           <CardHeader className="border-b">
             <CardTitle className="flex items-center gap-2">
               <MessageSquare className="h-5 w-5" />
@@ -879,7 +879,7 @@ export default function DMChatbotPage() {
         </div>
       ) : (
         /* Settings Panel */
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
           {/* Basic Settings */}
           <Card>
             <CardHeader>

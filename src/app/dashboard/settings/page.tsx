@@ -266,7 +266,7 @@ export default function SettingsPage() {
             </select>
           </div>
 
-          <div className="flex items-center justify-between rounded-lg border p-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between rounded-lg border p-4 gap-3">
             <div>
               <p className="font-medium">Auto-Post</p>
               <p className="text-sm text-muted-foreground">
@@ -572,7 +572,7 @@ export default function SettingsPage() {
 
           <div className="rounded-lg bg-muted/50 p-3">
             <p className="text-sm font-medium">API Usage Summary</p>
-            <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+            <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Gemini:</span>
                 <span

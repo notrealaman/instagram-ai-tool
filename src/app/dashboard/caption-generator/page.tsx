@@ -215,7 +215,7 @@ export default function CaptionGeneratorPage() {
       </div>
 
       {activeTab === "generator" ? (
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
           {/* Settings Panel */}
           <div className="lg:col-span-1">
             <Card>

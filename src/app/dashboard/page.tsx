@@ -155,7 +155,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8">
       <Card className="stat-card">
-        <CardContent className="flex items-center gap-4 p-4">
+        <CardContent className="flex flex-col sm:flex-row items-center gap-4 p-4">
           {profile.profilePicture && (
             <img
               src={profile.profilePicture}
@@ -163,12 +163,12 @@ export default function DashboardPage() {
               className="h-16 w-16 rounded-full"
             />
           )}
-          <div className="flex-1">
+          <div className="flex-1 text-center sm:text-left">
             <h2 className="text-xl font-bold">@{profile.username}</h2>
             {profile.biography && (
               <p className="text-sm text-muted-foreground line-clamp-2">{profile.biography}</p>
             )}
-            <div className="mt-2 flex gap-4 text-sm">
+            <div className="mt-2 flex justify-center sm:justify-start gap-4 text-sm">
               <span><strong>{formatNumber(profile.mediaCount)}</strong> posts</span>
               <span><strong>{formatNumber(profile.followers)}</strong> followers</span>
               <span><strong>{formatNumber(profile.following)}</strong> following</span>
@@ -185,7 +185,7 @@ export default function DashboardPage() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         {statCards.map((stat) => (
           <Card key={stat.title} className="stat-card">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -201,7 +201,7 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
         <Card>
           <CardHeader>
             <CardTitle>Performance Stats</CardTitle>
@@ -350,7 +350,7 @@ export default function DashboardPage() {
             <CardDescription>Best performing content by likes</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               {topPosts.map((post) => (
                 <a
                   key={post.id}

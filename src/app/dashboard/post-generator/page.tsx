@@ -174,7 +174,7 @@ export default function PostGeneratorPage() {
   };
 
   return (
-    <div className="grid gap-6 lg:grid-cols-3">
+    <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
       <div className="lg:col-span-1">
         <Card>
           <CardHeader>
