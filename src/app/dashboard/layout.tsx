@@ -60,7 +60,7 @@ const sidebarItems = [
     icon: Subtitles,
   },
   {
-    title: "Download",
+    title: "Video Download",
     href: "/dashboard/download",
     icon: Download,
   },
