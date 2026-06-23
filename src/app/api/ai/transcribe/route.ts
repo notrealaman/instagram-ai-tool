@@ -98,8 +98,9 @@ export async function POST(request: Request) {
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const transcriptionPrompt = prompt ||
-      `Please transcribe ALL spoken words in this video audio.
+      `Transcribe ALL spoken words in this video audio in English only.
        Return the full transcription with timestamps where possible.
+       If the video contains non-English speech, translate and transcribe in English.
        If there is no speech, describe any sounds or music you hear.
        Format the output clearly with paragraphs for different speakers if multiple.
        Be thorough and capture every word spoken.`;
@@ -119,7 +120,7 @@ export async function POST(request: Request) {
 
     // Also get a summary
     const summaryResult = await model.generateContent([
-      `Based on this video, provide:
+      `Based on this video, provide in English only:
        1. A brief summary (2-3 sentences)
        2. Key topics/themes mentioned
        3. Sentiment (positive/neutral/negative)`,
