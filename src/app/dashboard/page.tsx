@@ -10,6 +10,13 @@ import {
   TrendingUp,
   Award,
   Target,
+  X,
+  Eye,
+  Bookmark,
+  Share2,
+  BarChart3,
+  Clock,
+  MessageSquare,
 } from "lucide-react";
 import {
   Card,
@@ -18,6 +25,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { formatNumber } from "@/lib/utils";
 
 interface DashboardData {
@@ -67,10 +75,45 @@ interface DashboardData {
   }>;
 }
 
+interface PostDetail {
+  post: {
+    id: string;
+    caption: string;
+    mediaType: string;
+    imageUrl: string;
+    permalink: string;
+    timestamp: string;
+    likes: number;
+    comments: number;
+    childCount: number;
+  };
+  insights: {
+    impressions: number;
+    reach: number;
+    engagement: number;
+    saved: number;
+    shares: number;
+    videoViews: number;
+    engagementRate: number;
+    saveRate: number;
+    shareRate: number;
+    followers: number;
+  };
+  comments: Array<{
+    id: string;
+    text: string;
+    timestamp: string;
+    username: string;
+  }>;
+}
+
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  const [postDetail, setPostDetail] = useState<PostDetail | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
 
   useEffect(() => {
     fetchDashboardData();
@@ -91,6 +134,28 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchPostDetail = async (postId: string) => {
+    setSelectedPostId(postId);
+    setLoadingDetail(true);
+    setPostDetail(null);
+    try {
+      const res = await fetch(`/api/instagram/post-detail?postId=${postId}`);
+      if (res.ok) {
+        const detail = await res.json();
+        setPostDetail(detail);
+      }
+    } catch {
+      console.error("Failed to fetch post detail");
+    } finally {
+      setLoadingDetail(false);
+    }
+  };
+
+  const closeModal = () => {
+    setSelectedPostId(null);
+    setPostDetail(null);
   };
 
   if (loading) {
@@ -249,12 +314,10 @@ export default function DashboardPage() {
             <div className="space-y-4">
               {recentPosts.length > 0 ? (
                 recentPosts.map((post) => (
-                  <a
+                  <button
                     key={post.id}
-                    href={post.permalink || "#"}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-start gap-4 rounded-lg border p-3 transition-colors hover:bg-muted/50"
+                    onClick={() => fetchPostDetail(post.id)}
+                    className="flex items-start gap-4 rounded-lg border p-3 transition-colors hover:bg-muted/50 w-full text-left cursor-pointer"
                   >
                     <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded bg-muted">
                       {post.mediaUrl ? (
@@ -285,7 +348,7 @@ export default function DashboardPage() {
                         </span>
                       </div>
                     </div>
-                  </a>
+                  </button>
                 ))
               ) : (
                 <p className="text-sm text-muted-foreground text-center py-4">
@@ -307,11 +370,9 @@ export default function DashboardPage() {
             <CardDescription>Your most liked post</CardDescription>
           </CardHeader>
           <CardContent>
-            <a
-              href={bestPost.permalink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-start gap-4 rounded-lg border p-4 transition-colors hover:bg-muted/50"
+            <button
+              onClick={() => fetchPostDetail(bestPost.id)}
+              className="flex items-start gap-4 rounded-lg border p-4 transition-colors hover:bg-muted/50 w-full text-left cursor-pointer"
             >
               <div className="h-20 w-20 flex-shrink-0 overflow-hidden rounded bg-muted">
                 {bestPost.mediaUrl ? (
@@ -338,7 +399,7 @@ export default function DashboardPage() {
                   <span>{new Date(bestPost.timestamp).toLocaleDateString()}</span>
                 </div>
               </div>
-            </a>
+            </button>
           </CardContent>
         </Card>
       )}
@@ -352,12 +413,10 @@ export default function DashboardPage() {
           <CardContent>
             <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               {topPosts.map((post) => (
-                <a
+                <button
                   key={post.id}
-                  href={post.permalink || "#"}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group relative overflow-hidden rounded-lg"
+                  onClick={() => fetchPostDetail(post.id)}
+                  className="group relative overflow-hidden rounded-lg cursor-pointer"
                 >
                   <img
                     src={post.imageUrl}
@@ -376,11 +435,271 @@ export default function DashboardPage() {
                       </span>
                     </div>
                   </div>
-                </a>
+                </button>
               ))}
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Post Detail Modal */}
+      {selectedPostId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60" onClick={closeModal} />
+          <div className="relative z-10 w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-card rounded-xl shadow-2xl border m-4">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b sticky top-0 bg-card z-10">
+              <h2 className="text-lg font-semibold">Post Analytics</h2>
+              <Button variant="ghost" size="icon" onClick={closeModal}>
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+
+            {loadingDetail ? (
+              <div className="flex h-64 items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : postDetail ? (
+              <div className="p-6">
+                <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
+                  {/* Post Image */}
+                  <div className="rounded-lg overflow-hidden bg-muted">
+                    {postDetail.post.imageUrl ? (
+                      <img
+                        src={postDetail.post.imageUrl}
+                        alt="Post"
+                        className="w-full h-auto object-contain max-h-[400px]"
+                      />
+                    ) : (
+                      <div className="flex h-64 items-center justify-center text-muted-foreground">
+                        No image available
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Post Info */}
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">
+                        {new Date(postDetail.post.timestamp).toLocaleString("en-US", {
+                          weekday: "long",
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                      <p className="whitespace-pre-wrap text-sm">
+                        {postDetail.post.caption || "No caption"}
+                      </p>
+                    </div>
+
+                    {/* Quick Stats */}
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="rounded-lg border p-3 text-center">
+                        <Heart className="h-5 w-5 mx-auto text-red-500 mb-1" />
+                        <div className="text-xl font-bold">{postDetail.post.likes.toLocaleString()}</div>
+                        <div className="text-xs text-muted-foreground">Likes</div>
+                      </div>
+                      <div className="rounded-lg border p-3 text-center">
+                        <MessageCircle className="h-5 w-5 mx-auto text-blue-500 mb-1" />
+                        <div className="text-xl font-bold">{postDetail.post.comments.toLocaleString()}</div>
+                        <div className="text-xs text-muted-foreground">Comments</div>
+                      </div>
+                      <div className="rounded-lg border p-3 text-center">
+                        <TrendingUp className="h-5 w-5 mx-auto text-emerald-500 mb-1" />
+                        <div className="text-xl font-bold">{postDetail.insights.engagementRate}%</div>
+                        <div className="text-xs text-muted-foreground">Engagement</div>
+                      </div>
+                    </div>
+
+                    <a
+                      href={postDetail.post.permalink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
+                    >
+                      View on Instagram <ExternalLink className="h-4 w-4" />
+                    </a>
+                  </div>
+                </div>
+
+                {/* Detailed Insights */}
+                <div className="mt-6 space-y-4">
+                  <h3 className="text-base font-semibold">Detailed Insights</h3>
+                  <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+                    <Card className="stat-card">
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Eye className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">Impressions</span>
+                        </div>
+                        <div className="text-2xl font-bold">
+                          {postDetail.insights.impressions.toLocaleString()}
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card className="stat-card">
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Users className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">Reach</span>
+                        </div>
+                        <div className="text-2xl font-bold">
+                          {postDetail.insights.reach.toLocaleString()}
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card className="stat-card">
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Bookmark className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">Saved</span>
+                        </div>
+                        <div className="text-2xl font-bold">
+                          {postDetail.insights.saved.toLocaleString()}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {postDetail.insights.saveRate}% save rate
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card className="stat-card">
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Share2 className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">Shares</span>
+                        </div>
+                        <div className="text-2xl font-bold">
+                          {postDetail.insights.shares.toLocaleString()}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {postDetail.insights.shareRate}% share rate
+                        </div>
+                      </CardContent>
+                    </Card>
+                    {postDetail.post.mediaType === "VIDEO" && (
+                      <Card className="stat-card">
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-2 mb-1">
+                            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-xs text-muted-foreground">Video Views</span>
+                          </div>
+                          <div className="text-2xl font-bold">
+                            {postDetail.insights.videoViews.toLocaleString()}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+
+                  {/* Engagement Breakdown */}
+                  <Card>
+                    <CardContent className="p-4">
+                      <h4 className="text-sm font-medium mb-3">Engagement Breakdown</h4>
+                      <div className="space-y-2">
+                        {postDetail.insights.impressions > 0 && (
+                          <>
+                            <div>
+                              <div className="flex justify-between text-xs mb-1">
+                                <span>Likes</span>
+                                <span>
+                                  {((postDetail.post.likes / postDetail.insights.impressions) * 100).toFixed(2)}%
+                                </span>
+                              </div>
+                              <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-red-500 rounded-full"
+                                  style={{
+                                    width: `${Math.min((postDetail.post.likes / postDetail.insights.impressions) * 100, 100)}%`,
+                                  }}
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <div className="flex justify-between text-xs mb-1">
+                                <span>Comments</span>
+                                <span>
+                                  {((postDetail.post.comments / postDetail.insights.impressions) * 100).toFixed(2)}%
+                                </span>
+                              </div>
+                              <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-blue-500 rounded-full"
+                                  style={{
+                                    width: `${Math.min((postDetail.post.comments / postDetail.insights.impressions) * 100, 100)}%`,
+                                  }}
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <div className="flex justify-between text-xs mb-1">
+                                <span>Saves</span>
+                                <span>{postDetail.insights.saveRate}%</span>
+                              </div>
+                              <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-emerald-500 rounded-full"
+                                  style={{
+                                    width: `${Math.min(postDetail.insights.saveRate, 100)}%`,
+                                  }}
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <div className="flex justify-between text-xs mb-1">
+                                <span>Shares</span>
+                                <span>{postDetail.insights.shareRate}%</span>
+                              </div>
+                              <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-purple-500 rounded-full"
+                                  style={{
+                                    width: `${Math.min(postDetail.insights.shareRate, 100)}%`,
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Comments Section */}
+                {postDetail.comments.length > 0 && (
+                  <div className="mt-6">
+                    <h3 className="text-base font-semibold mb-3">
+                      Comments ({postDetail.comments.length})
+                    </h3>
+                    <Card>
+                      <CardContent className="p-0 divide-y max-h-64 overflow-y-auto">
+                        {postDetail.comments.map((comment) => (
+                          <div key={comment.id} className="p-3">
+                            <div className="flex items-center gap-2 mb-1">
+                              <MessageSquare className="h-3 w-3 text-muted-foreground" />
+                              <span className="text-sm font-medium">@{comment.username}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {new Date(comment.timestamp).toLocaleString()}
+                              </span>
+                            </div>
+                            <p className="text-sm">{comment.text}</p>
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex h-64 items-center justify-center text-muted-foreground">
+                Failed to load post details
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

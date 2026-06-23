@@ -17,6 +17,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   BarChart3,
+  Subtitles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -51,6 +52,11 @@ const sidebarItems = [
     title: "DM Chatbot",
     href: "/dashboard/dm-chatbot",
     icon: MessageSquare,
+  },
+  {
+    title: "Transcribe",
+    href: "/dashboard/transcribe",
+    icon: Subtitles,
   },
   {
     title: "Settings",
