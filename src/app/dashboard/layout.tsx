@@ -18,6 +18,7 @@ import {
   PanelLeftOpen,
   BarChart3,
   Subtitles,
+  Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -57,6 +58,11 @@ const sidebarItems = [
     title: "Transcribe",
     href: "/dashboard/transcribe",
     icon: Subtitles,
+  },
+  {
+    title: "Download",
+    href: "/dashboard/download",
+    icon: Download,
   },
   {
     title: "Settings",
