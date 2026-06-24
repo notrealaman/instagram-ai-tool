@@ -217,7 +217,7 @@ export default function ContentPlannerPage() {
           <div>
             <CardTitle className="flex items-center gap-2">
               <Calendar className="h-5 w-5" />
-              Content Planner
+              Post Schedule
             </CardTitle>
             <CardDescription>
               Plan and schedule your Instagram content

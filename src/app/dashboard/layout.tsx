@@ -66,7 +66,7 @@ const sidebarItems = [
     icon: Download,
   },
   {
-    title: "Content Planner",
+    title: "Post Schedule",
     href: "/dashboard/content-planner",
     icon: CalendarDays,
   },
