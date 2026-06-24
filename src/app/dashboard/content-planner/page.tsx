@@ -81,11 +81,13 @@ function getFirstDayOfMonth(year: number, month: number) {
 export default function ContentPlannerPage() {
   const [plans, setPlans] = useState<ContentPlan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<ContentPlan | null>(null);
   const [saving, setSaving] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [accountInfo, setAccountInfo] = useState<{ username: string; instagramId: string } | null>(null);
 
   // Form state
   const [formTitle, setFormTitle] = useState("");
@@ -100,16 +102,34 @@ export default function ContentPlannerPage() {
 
   const fetchPlans = async () => {
     try {
+      setError("");
       const res = await fetch("/api/content-planner");
       const data = await res.json();
-      if (data.success) setPlans(data.plans);
-    } catch {} finally {
+      if (data.success) {
+        setPlans(data.plans);
+      } else {
+        setError(data.error || "Failed to load posts");
+      }
+    } catch (err) {
+      setError("Failed to connect to server");
+    } finally {
       setLoading(false);
     }
   };
 
+  const fetchAccount = async () => {
+    try {
+      const res = await fetch("/api/instagram/dashboard");
+      const data = await res.json();
+      if (data.success && data.profile) {
+        setAccountInfo({ username: data.profile.username, instagramId: data.profile.id });
+      }
+    } catch {}
+  };
+
   useEffect(() => {
     fetchPlans();
+    fetchAccount();
   }, []);
 
   const openNewDialog = (date?: string) => {
@@ -168,8 +188,12 @@ export default function ContentPlannerPage() {
       if (data.success) {
         setDialogOpen(false);
         fetchPlans();
+      } else {
+        setError(data.error || "Failed to save");
       }
-    } catch {} finally {
+    } catch (err) {
+      setError("Failed to save post");
+    } finally {
       setSaving(false);
     }
   };
@@ -221,6 +245,11 @@ export default function ContentPlannerPage() {
             </CardTitle>
             <CardDescription>
               Plan and schedule your Instagram content
+              {accountInfo && (
+                <span className="ml-1 text-foreground font-medium">
+                  for @{accountInfo.username}
+                </span>
+              )}
             </CardDescription>
           </div>
           <Button onClick={() => openNewDialog()}>
@@ -230,6 +259,24 @@ export default function ContentPlannerPage() {
         </CardHeader>
       </Card>
 
+      {error && (
+        <Card className="border-destructive">
+          <CardContent className="p-4">
+            <p className="text-sm text-destructive">{error}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {loading && (
+        <Card>
+          <CardContent className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <span className="ml-2 text-muted-foreground">Loading posts...</span>
+          </CardContent>
+        </Card>
+      )}
+
+      {!loading && (
       <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
         {/* Calendar */}
         <Card className="lg:col-span-2">
@@ -464,6 +511,7 @@ export default function ContentPlannerPage() {
           </CardContent>
         </Card>
       </div>
+      )}
 
       {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
