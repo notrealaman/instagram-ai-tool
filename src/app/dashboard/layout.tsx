@@ -19,6 +19,7 @@ import {
   BarChart3,
   Subtitles,
   Download,
+  CalendarDays,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -63,6 +64,11 @@ const sidebarItems = [
     title: "Video Download",
     href: "/dashboard/download",
     icon: Download,
+  },
+  {
+    title: "Content Planner",
+    href: "/dashboard/content-planner",
+    icon: CalendarDays,
   },
   {
     title: "Settings",
